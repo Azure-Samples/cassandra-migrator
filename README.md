@@ -20,7 +20,7 @@ We recommend selecting Azure Databricks runtime version 7.5, which supports Spar
 
 ## Add Cassandra Migrator Spark dependencies
 
-* Download the dependency jar [here](https://github.com/TheovanKraay/cassandra-migrator/raw/main/jar/cassandra-migrator-assembly-0.0.1.jar) * 
+* Download the dependency jar [here](https://github.com/Azure-Samples/cassandra-migrator/raw/main/jar/cassandra-migrator-assembly-0.0.1.jar) * 
 * Upload and install the jar on your Databricks cluster:
 
 <!-- :::image type="content" source="./media/cassandra-migrator-jar.jpg" alt-text="Screenshot that shows searching for Maven packages in Databricks."::: -->
