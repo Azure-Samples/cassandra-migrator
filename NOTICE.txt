@@ -1,0 +1,3 @@
+This sample contains code that was originally developed by ScyllaDB, see https://github.com/scylladb/scylla-migrator.
+
+The goals of this sample diverge from that project, so we have taken a copy and are developing this in a different direction.
