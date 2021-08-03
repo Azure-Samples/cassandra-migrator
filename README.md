@@ -138,3 +138,17 @@ writers.Cassandra.writeDataframe(
             sourceDF.timestampColumns
 )
 ```
+
+### SSLOptions Parameters
+|Parameter|Description|Default value|
+|----------|-------------|------|
+|enabled  |Enable secure connection to Cassandra cluster  | false |
+|trustStorePath |Path for the trust store being used    |None|
+|trustStorePassword |Trust store password |None|
+|trustStoreType |Trust store type |JKS|
+|protocol |SSL protocol |TLS|
+|enabledAlgorithms |SSL cipher suites |Set("TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA")|
+|clientAuthEnabled |Enable 2-way secure connection to Cassandra cluster |false|
+|keyStorePath |Path for the key store being used |None|
+|keyStorePassword |Key store password |None|
+|keyStoreType |Key store type |JKS|
