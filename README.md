@@ -13,7 +13,7 @@ This sample allows you to migrate data between tables in Apache Cassandra using 
 
 ## Provision a Spark cluster
 
-We recommend selecting Azure Databricks runtime version 7.5, which supports Spark 3.0.
+Select an Azure Databricks runtime version which supports Spark 3.0 or higher.
 
 <!-- :::image type="content" source="https://docs.microsoft.com/azure/cosmos-db/media/cassandra-migrate-cosmos-db-databricks/databricks-runtime.png" alt-text="Screenshot that shows finding the Databricks runtime version."::: -->
 ![Databricks runtime](https://docs.microsoft.com/azure/cosmos-db/media/cassandra-migrate-cosmos-db-databricks/databricks-runtime.png)
@@ -28,10 +28,24 @@ We recommend selecting Azure Databricks runtime version 7.5, which supports Spar
 
 Select **Install**, and then restart the cluster when installation is complete.
 
-\* You can also build the dependency jar using [SBT](https://www.scala-sbt.org/1.x/docs/Setup.html) by running `build.sh` in the /build_files directory of this repo.
+\* You can also build the dependency jar using [SBT](https://www.scala-sbt.org/1.x/docs/Setup.html) by running `./build.sh` in the /build_files directory of this repo.
 
 > [!NOTE]
 > Make sure that you restart the Databricks cluster after the dependency jar has been installed.
+
+## Configure Spark Connector throughput
+
+In order to maximize throughput for large migrations, you may need to change Spark parameters at the cluster level. You can apply these settings in `advanced options` within cluster config, e.g. below. You may also want to increase the number of workers in your Spark cluster.
+
+```config
+spark.cassandra.output.batch.size.rows 1
+spark.cassandra.output.concurrent.writes 500
+spark.cassandra.concurrent.reads 512
+spark.cassandra.output.batch.grouping.buffer.size 1000
+spark.cassandra.connection.keep_alive_ms 600000000
+```
+
+![Config](./media/config.jpg)
 
 # Migrate Cassandra tables
 
@@ -138,6 +152,45 @@ writers.Cassandra.writeDataframe(
             sourceDF.timestampColumns
 )
 ```
+
+# Validate Migration
+
+To validate the migration using [row comparison](https://github.com/Azure-Samples/cassandra-migrator/blob/main/build_files/src/main/scala/com/cassandra/migrator/validation/RowComparisonFailure.scala), create a third cell with the following and adjust the parameters to preferred tolerance:
+
+```scala
+import com.cassandra.migrator.Validator
+import com.cassandra.migrator.config._
+
+val spark = SparkSession
+      .builder()
+      .appName("cassandra-migrator")
+      .config("spark.task.maxFailures", "1024")
+      .config("spark.stage.maxConsecutiveAttempts", "60") 
+      .getOrCreate
+
+val validatorConfig = new Validation(
+  compareTimestamps = true,
+  ttlToleranceMillis = 1,
+  writetimeToleranceMillis = 1,
+  failuresToFetch = 10,
+  floatingPointTolerance = 1.0
+)
+
+val migratorConfig = new MigratorConfig(
+  cassandraSource,
+  target,
+  List(),
+  savepoints = null,
+  skipTokenRanges = Set(),
+  validatorConfig
+)
+
+Validator.runValidation(migratorConfig)(spark)
+```
+
+If rows do not match, this will return something like the following output:
+
+![Validation output](./media/validation.jpg)
 
 ### SSLOptions Parameters
 |Parameter|Description|Default value|
