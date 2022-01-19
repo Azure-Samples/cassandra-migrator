@@ -192,6 +192,83 @@ If rows do not match, this will return something like the following output:
 
 ![Validation output](./media/validation.jpg)
 
+# Retry transient failures
+
+The [row comparison](https://github.com/Azure-Samples/cassandra-migrator/blob/main/build_files/src/main/scala/com/cassandra/migrator/validation/RowComparisonFailure.scala) in `Validation` may return an error for missing rows in the target table, for example see below:
+
+![Missing records](./media/missing-records.jpg)
+
+This may indicate that a transient failure occured during the overall migration process. If this happens, you can use the Validator to extract the missing records, and re-run the migration inserting only those records, as long as you can specify the primary key for filtering.
+
+Add the below sample cell after your existing cells in the same notebook. This will construct the values required in the "where" parameter of `SourceSettings` resulting from the row comparison, and will then write only those filtered records to the target table. Be sure to change the value of `primaryKey` to be the name of your primary key field, as well as replacing the credentials and source keyspace/table:
+
+```scala
+implicit val spark = SparkSession
+      .builder()
+      .appName("cassandra-migrator")
+      .config("spark.task.maxFailures", "1024")
+      .config("spark.stage.maxConsecutiveAttempts", "60")
+      .getOrCreate
+
+//construct Cassandra IN clause to filter only missing rows - ***CHANGE primaryKey
+val primaryKey = "<primary key of source/target table>"
+val failures = Validator.runValidation(migratorConfig)(spark)
+val whereValues = new StringBuilder(primaryKey+" IN (");
+val numfailures = failures.length
+var counter = 1
+for (source <- failures)
+{
+  whereValues ++= "'"+source.row.getString(primaryKey)+"'"
+  if (counter != numfailures) whereValues ++= "," else whereValues ++= ")"
+  counter+=1
+}
+
+//re-set cassandraSource
+var cassandraSource = new SourceSettings.Cassandra(
+  host = "<source Cassandra host name/IP here>",
+  port = 9042,
+  localDC = None,
+  credentials = Some(Credentials(
+    username="<username here>", 
+    password="<password here>")
+  ),
+  sslOptions = Some(SSLOptions(
+    clientAuthEnabled=false,
+    enabled=true,
+    trustStorePassword = None,
+    trustStorePath = None,
+    trustStoreType = None,
+    keyStorePassword = None,
+    keyStorePath = None,
+    keyStoreType = None,
+    enabledAlgorithms = None,
+    protocol = Some("TLS")
+  )),  
+  keyspace = "<source keyspace name>",
+  table = "<source table name>",
+  splitCount = Some(1),
+  connections = Some(1), 
+  fetchSize = 1000, 
+  preserveTimestamps = true,
+  //specifying where values extracted from validation above to filter only missing records for migration
+  where = Some(whereValues.toString())
+)
+
+val sourceDF = Cassandra.readDataframe(
+  spark,
+  cassandraSource,
+  cassandraSource.preserveTimestamps,
+  tokenRangesToSkip = Set()
+)
+// re-use exiting target config to re-migrate only failed records
+writers.Cassandra.writeDataframe(
+            target,
+            List(),
+            sourceDF.dataFrame,
+            sourceDF.timestampColumns
+)
+```  
+
 ### SSLOptions Parameters
 |Parameter|Description|Default value|
 |----------|-------------|------|
