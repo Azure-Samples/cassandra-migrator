@@ -213,15 +213,9 @@ implicit val spark = SparkSession
 //construct Cassandra IN clause to filter only missing rows - ***CHANGE primaryKey
 val primaryKey = "<primary key of source/target table>"
 val failures = Validator.runValidation(migratorConfig)(spark)
-val whereValues = new StringBuilder(primaryKey+" IN (");
-val numfailures = failures.length
-var counter = 1
-for (source <- failures)
-{
-  whereValues ++= "'"+source.row.getString(primaryKey)+"'"
-  if (counter != numfailures) whereValues ++= "," else whereValues ++= ")"
-  counter+=1
-}
+val whereValues = failures
+  .map(failure => s"'${failure.row.getString(primaryKey)}'")
+  .mkString(s"$primaryKey IN (", ",", ")")
 
 //re-set cassandraSource
 var cassandraSource = new SourceSettings.Cassandra(
@@ -251,7 +245,7 @@ var cassandraSource = new SourceSettings.Cassandra(
   fetchSize = 1000, 
   preserveTimestamps = true,
   //specifying where values extracted from validation above to filter only missing records for migration
-  where = Some(whereValues.toString())
+  where = Some(whereValues)
 )
 
 val sourceDF = Cassandra.readDataframe(
