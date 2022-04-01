@@ -3,6 +3,7 @@ package com.cassandra.migrator
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql._
 import com.datastax.spark.connector.rdd.ReadConf
+import com.cassandra.migrator.readers.Cassandra
 import com.cassandra.migrator.config.{ MigratorConfig, SourceSettings, TargetSettings }
 import com.cassandra.migrator.validation.RowComparisonFailure
 import org.apache.log4j.{ Level, LogManager, Logger }
@@ -58,18 +59,33 @@ object Validator {
         (sourceTableDef.partitionKey ++ sourceTableDef.clusteringColumns)
           .map(colDef => ColumnName(colDef.columnName, renameMap.get(colDef.columnName)))
 
-      spark.sparkContext
-        .cassandraTable(sourceSettings.keyspace, sourceSettings.table)
-        .withConnector(sourceConnector)
-        .withReadConf(
-          ReadConf
-            .fromSparkConf(spark.sparkContext.getConf)
-            .copy(
-              splitCount      = sourceSettings.splitCount,
-              fetchSizeInRows = sourceSettings.fetchSize
-            )
-        )
-        .select(primaryKeyProjection ++ regularColumnsProjection: _*)
+      if (sourceSettings.where == None)
+        spark.sparkContext
+          .cassandraTable(sourceSettings.keyspace, sourceSettings.table)
+          .withConnector(sourceConnector)
+          .withReadConf(
+            ReadConf
+              .fromSparkConf(spark.sparkContext.getConf)
+              .copy(
+                splitCount      = sourceSettings.splitCount,
+                fetchSizeInRows = sourceSettings.fetchSize
+              )
+          )
+          .select(primaryKeyProjection ++ regularColumnsProjection: _*)
+      else
+        spark.sparkContext
+          .cassandraTable(sourceSettings.keyspace, sourceSettings.table)
+          .withConnector(sourceConnector)
+          .withReadConf(
+            ReadConf
+              .fromSparkConf(spark.sparkContext.getConf)
+              .copy(
+                splitCount      = sourceSettings.splitCount,
+                fetchSizeInRows = sourceSettings.fetchSize
+              )
+          )
+          .select(primaryKeyProjection ++ regularColumnsProjection: _*)
+          .where(sourceSettings.where.get)
     }
 
     val joined = {
