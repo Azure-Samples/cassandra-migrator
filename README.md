@@ -20,7 +20,7 @@ Select an Azure Databricks runtime version which supports Spark 3.0 or higher.
 
 ## Add Cassandra Migrator Spark dependencies
 
-* Download the dependency jar [here](https://github.com/Azure-Samples/cassandra-migrator/raw/main/jar/cassandra-migrator-assembly-0.0.1.jar) * 
+* Download the dependency jar [here](https://github.com/Azure-Samples/cassandra-migrator/raw/main/jar/cassandra-migrator-assembly-0.0.2.jar) * 
 * Upload and install the jar on your Databricks cluster:
 
 <!-- :::image type="content" source="./media/cassandra-migrator-jar.jpg" alt-text="Screenshot that shows searching for Maven packages in Databricks."::: -->
