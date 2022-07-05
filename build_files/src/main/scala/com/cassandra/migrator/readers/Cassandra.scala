@@ -1,18 +1,18 @@
 package com.cassandra.migrator.readers
 
+import com.cassandra.migrator.Connectors
+import com.cassandra.migrator.config.{CopyType, SourceSettings}
 import com.datastax.spark.connector._
-import com.datastax.spark.connector.cql.{ Schema, TableDef }
+import com.datastax.spark.connector.cql.{Schema, TableDef}
 import com.datastax.spark.connector.rdd.ReadConf
 import com.datastax.spark.connector.rdd.partitioner.dht.Token
 import com.datastax.spark.connector.types.CassandraOption
-import com.cassandra.migrator.Connectors
-import com.cassandra.migrator.config.{ CopyType, SourceSettings }
 import org.apache.log4j.LogManager
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.cassandra.{ CassandraSQLRow, DataTypeConverter }
+import org.apache.spark.sql.cassandra.{CassandraSQLRow, DataTypeConverter}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
-import org.apache.spark.sql.types.{ IntegerType, LongType, StructField, StructType }
-import org.apache.spark.sql.{ DataFrame, Row, SparkSession }
+import org.apache.spark.sql.types.{IntegerType, LongType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.unsafe.types.UTF8String
 
 import scala.collection.mutable.ArrayBuffer
@@ -125,6 +125,11 @@ object Cassandra {
         else rowTimestampsToFields
 
       timestampsToFields
+        .toList
+        // sort all inserts by ttl in the descending order, such that the last insert has the lowest ttl.
+        // If insert without using TTL, this row is live and won't be deleted despite all its cells are
+        // null. In order to avoid all cells are null but the row exists, we need to put it first.
+        .sortBy(row => -row._1._1.getOrElse(Int.MaxValue))
         .map {
           case ((ttl, writetime), fields) =>
             val newValues = schema.fields.map { field =>
