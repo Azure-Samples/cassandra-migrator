@@ -1,4 +1,4 @@
-import sbt.librarymanagement.InclExclRule
+
 
 
 assemblyMergeStrategy in assembly := {
@@ -15,7 +15,7 @@ lazy val root = (project in file(".")).settings(
       scalaVersion := "2.12.11"
     )),
   name      := "cassandra-migrator",
-  version   := "0.0.2",
+  version   := "0.0.3",
   mainClass := Some("com.cassandra.migrator.Migrator"),
   javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
   javaOptions ++= Seq(
