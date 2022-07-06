@@ -145,9 +145,8 @@ object Cassandra {
             Row(newValues: _*)
         }
 
-      // If there are multiple inserts, add one more insert that only inserts ids using max writetime and min ttl.
+      // If there are multiple inserts, add one more insert that only inserts ids using min ttl.
       val minTTL = timestampsToFields.map(_._1._1).minBy(_.getOrElse(Int.MaxValue))
-      val maxWriteTime = timestampsToFields.map(_._1._2).maxBy(_.getOrElse(Long.MinValue))
       if (rows.size > 1 && minTTL.isDefined) {
         val newValues = schema.fields.map { field =>
           primaryKeyOrdinals
@@ -157,7 +156,7 @@ object Cassandra {
               else Some(row.get(ord))
             }
             .getOrElse(CassandraOption.Unset)
-        } ++ Seq(minTTL.get, maxWriteTime.getOrElse(CassandraOption.Unset))
+        } ++ Seq(minTTL.get, CassandraOption.Unset)
 
         rows = rows ++ List(Row(newValues: _*))
       }
