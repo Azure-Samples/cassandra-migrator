@@ -1,6 +1,3 @@
-
-
-
 assemblyMergeStrategy in assembly := {
   case "module-info.class" => MergeStrategy.discard
   case x =>

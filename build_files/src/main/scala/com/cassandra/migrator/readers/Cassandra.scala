@@ -125,11 +125,6 @@ object Cassandra {
         else rowTimestampsToFields
 
       var rows = timestampsToFields
-        .toList
-        // sort all inserts by ttl in the descending order, such that the last insert has the lowest ttl.
-        // If insert without using TTL, this row is live and won't be deleted despite all its cells are
-        // null. In order to avoid all cells are null but the row exists, we need to put it first.
-        .sortBy(row => -row._1._1.getOrElse(Int.MaxValue))
         .map {
           case ((ttl, writetime), fields) =>
             val newValues = schema.fields.map { field =>
