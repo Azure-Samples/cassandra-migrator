@@ -124,7 +124,7 @@ object Cassandra {
         if (rowTimestampsToFields.size > 1) rowTimestampsToFields.-((None, None))
         else rowTimestampsToFields
 
-      timestampsToFields
+      var rows = timestampsToFields
         .toList
         // sort all inserts by ttl in the descending order, such that the last insert has the lowest ttl.
         // If insert without using TTL, this row is live and won't be deleted despite all its cells are
@@ -144,6 +144,25 @@ object Cassandra {
 
             Row(newValues: _*)
         }
+
+      // If there are multiple inserts, add one more insert that only inserts ids using max writetime and min ttl.
+      val minTTL = timestampsToFields.map(_._1._1).minBy(_.getOrElse(Int.MaxValue))
+      val maxWriteTime = timestampsToFields.map(_._1._2).maxBy(_.getOrElse(Long.MinValue))
+      if (rows.size > 1 && minTTL.isDefined) {
+        val newValues = schema.fields.map { field =>
+          primaryKeyOrdinals
+            .get(field.name)
+            .flatMap { ord =>
+              if (row.isNullAt(ord)) None
+              else Some(row.get(ord))
+            }
+            .getOrElse(CassandraOption.Unset)
+        } ++ Seq(minTTL.get, maxWriteTime.getOrElse(CassandraOption.Unset))
+
+        rows = rows ++ List(Row(newValues: _*))
+      }
+
+      rows
     }
 
   def indexFields(currentFieldNames: List[String],
