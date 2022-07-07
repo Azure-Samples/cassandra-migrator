@@ -92,7 +92,8 @@ object Cassandra {
   def explodeRow(row: Row,
                  schema: StructType,
                  primaryKeyOrdinals: Map[String, Int],
-                 regularKeyOrdinals: Map[String, (Int, Int, Int)]) =
+                 regularKeyOrdinals: Map[String, (Int, Int, Int)],
+                 usingMinTTLForPrimaryKeys: Boolean) =
     if (regularKeyOrdinals.isEmpty) List(row)
     else {
       val rowTimestampsToFields =
@@ -142,7 +143,7 @@ object Cassandra {
 
       // If there are multiple inserts, add one more insert that only inserts ids using min ttl.
       val minTTL = timestampsToFields.map(_._1._1).minBy(_.getOrElse(Int.MaxValue))
-      if (rows.size > 1 && minTTL.isDefined) {
+      if (usingMinTTLForPrimaryKeys && rows.size > 1 && minTTL.isDefined) {
         val newValues = schema.fields.map { field =>
           primaryKeyOrdinals
             .get(field.name)
@@ -153,7 +154,7 @@ object Cassandra {
             .getOrElse(CassandraOption.Unset)
         } ++ Seq(minTTL.get, CassandraOption.Unset)
 
-        rows = rows ++ List(Row(newValues: _*))
+        rows = List(Row(newValues: _*)) ++ rows
       }
 
       rows
@@ -186,7 +187,8 @@ object Cassandra {
                                               df: DataFrame,
                                               timestampColumns: Option[TimestampColumns],
                                               origSchema: StructType,
-                                              tableDef: TableDef): DataFrame =
+                                              tableDef: TableDef,
+                                              usingMinTTLForPrimaryKeys: Boolean): DataFrame =
     timestampColumns match {
       case None => df
       case Some(TimestampColumns(ttl, writeTime)) =>
@@ -211,7 +213,8 @@ object Cassandra {
             _,
             broadcastSchema.value,
             broadcastPrimaryKeyOrdinals.value,
-            broadcastRegularKeyOrdinals.value)
+            broadcastRegularKeyOrdinals.value,
+            usingMinTTLForPrimaryKeys)
         }(RowEncoder(finalSchema))
 
     }
@@ -219,7 +222,8 @@ object Cassandra {
   def readDataframe(spark: SparkSession,
                     source: SourceSettings.Cassandra,
                     preserveTimes: Boolean,
-                    tokenRangesToSkip: Set[(Token[_], Token[_])]): SourceDataFrame = {
+                    tokenRangesToSkip: Set[(Token[_], Token[_])],
+                    usingMinTTLForPrimaryKeys: Boolean = true): SourceDataFrame = {
     val connector = Connectors.sourceConnector(spark.sparkContext.getConf, source)
     val readConf = ReadConf
       .fromSparkConf(spark.sparkContext.getConf)
@@ -285,7 +289,8 @@ object Cassandra {
       spark.createDataFrame(rdd, selection.schema),
       selection.timestampColumns,
       origSchema,
-      tableDef
+      tableDef,
+      usingMinTTLForPrimaryKeys
     )
 
     SourceDataFrame(resultingDataframe, selection.timestampColumns, true)
